@@ -360,59 +360,46 @@ int builtin_cmd(char **argv)
 void do_bgfg(char **argv) 
 {
     // Put your code here. 
-    struct job_t *job;
-    char *tmp;
-    int jid;
-    pid_t pid;
-
-    tmp = argv[1];
+    struct job_t *tempJob;
+    int tempJid;
+    pid_t tempPid;
     
     // if id does not exist
-    if(tmp == NULL) {
+    if(argv[1] == NULL) {
         printf("%s command requires PID or %%jobid argument\n", argv[0]);
         return;
     }
-    
-    // if it is a jid
-    if(tmp[0] == '%') {  
-        jid = atoi(&tmp[1]); 
-        //get job
-        job = getjobjid(jobs, jid);
-        if(job == NULL){  
-            printf("%s: No such job\n", tmp);  
-            return;  
-        }else{
-            //get the pid if a valid job for later to kill
-            pid = job->pid;
-        }
-    } 
-    // if it is a pid
-    else if(isdigit(tmp[0])) { 
-        //get pid
-        pid = atoi(tmp); 
-        //get job 
-        job = getjobpid(jobs, pid); 
-        if(job == NULL){  
-            printf("(%d): No such process\n", pid);  
+    if(isdigit(argv[1][0])) { //This will check if the first character is a digit (0-9), if so, it is a pid
+        tempPid = atoi(argv[1]); //Convert char to int, which is the pid
+        tempJob = getjobpid(jobs, tempPid); //Get the job from the pid
+        if(tempJob == NULL){ //If it is not a valid job... 
+            printf("(%d): No such process\n", tempPid);  
             return;  
         }  
-    }  
-    else {
-        printf("%s: argument must be a PID or %%jobid\n", argv[0]);
-        return;
     }
-    //kill for each time
-    kill(-pid, SIGCONT);
-    
-    if(!strcmp("fg", argv[0])) {
-        //wait for fg
-        job->state = FG;
-        waitfg(job->pid);
+    else if(argv[1][0] == '%') {  //This will check if the first character of arrv[1] is a %, if som it is a jid
+        tempJid = atoi(&argv[1][1]); //Get the Jid from the char in argv, convert to int
+        tempJob = getjobjid(jobs, tempJid); // Set temporary job struct to the job from the jid
+        if(tempJob == NULL){  // If it is not a job at all, let the user know
+            printf("%s: No such job\n", argv[1]);  
+            return;  
+        }else{
+            tempPid = tempJob->pid; // Set the temporary pid to the pid of the job, if it is valid
+        }
+    }
+    else {
+        printf("%s: argument must be a PID or JID\n", argv[0]); //This is the case of if it is not a valid entry
+        return;
+    }  
+    if(strcmp("fg", argv[0]) != 0) { // If it is not in the forground (strcmp will return nonzero if it does not match)
+      kill(-tempPid, SIGCONT); //This will kill the job with a valid PID
+      printf("[%d] (%d) %s", tempJob->jid, tempJob->pid, tempJob->cmdline);
+      tempJob->state = BG;    //Change the state of the job
     } 
-    else{
-        //print for bg
-        printf("[%d] (%d) %s", job->jid, job->pid, job->cmdline);
-        job->state = BG;
+    else{ //Otherwise, it is in the background
+      kill(-tempPid, SIGCONT); //This will kill the job with a valid PID
+      tempJob->state = FG; //change the state to FG
+      waitfg(tempJob->pid); //Wait until PID is no longer in foreground (see function below)
     } 
 }
 
