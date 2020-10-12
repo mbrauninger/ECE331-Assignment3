@@ -235,6 +235,21 @@ void eval(char *cmdline)
         // Handle the background job and forgreound job differently 
         
         // Handle the signals 
+        if(isBgJob){ // if it is a background job, add to array as such
+          addjob(jobs, pid, BG, cmdline);
+        }
+        else { // if it is a foreground job, add to array as such
+          addjob(jobs, pid, FG, cmdline);
+        }
+            
+        sigprocmask(SIG_UNBLOCK, &mask, NULL); // signals are removed from current set of blocked signals
+            
+        if (isBgJob){
+          printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline); // output background job to console
+        } 
+        else {
+          waitfg(pid); // if it is a foreground job, wait
+        }
       }
     }
     return;
