@@ -361,8 +361,21 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
-    // Put your code here. 
-    return;
+    sigset_t mask, prev_mask;
+    sigset_t *mask_address = &mask; // pointer to address of mask
+    sigset_t *prev_address = &prev_mask; // pointer to address of prev_mask
+    
+    sigemptyset(mask_address); // creates empty signal set at the address of mask
+    sigaddset(mask_address, SIGCHLD); // adds SIGCHLD signal to empty set
+    sigprocmask(SIG_BLOCK, mask_address, prev_address); // signals are removed from current set of blocked signals
+
+    while(pid == fgpid(jobs)) {
+      sigsuspend(prev_address); // replaces signal mask of calling thread with prev_address, "suspending"
+    }
+
+    sigprocmask(SIG_SETMASK, prev_address, NULL); // used in conjunction with sigsuspend to prevent delivery of a signal here
+
+    return; 
 }
 
 /*****************
