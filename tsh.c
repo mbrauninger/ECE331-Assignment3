@@ -378,7 +378,27 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-    // Put your code here. 
+    int status; //Int representing status of procedure
+    pid_t tempPid;
+
+    while((tempPid = waitpid(fgpid(jobs), &status, WNOHANG|WUNTRACED)) > 0){ //While temp id is greater than 0
+      if (WIFSIGNALED(status)){ //If delete is signaled
+        int tempJid = pid2jid(tempPid); //get jid of the job from pid
+        printf("Job [%d] (%d) terminated by signal %d\n", tempJid, tempPid, WTERMSIG(status));
+        deletejob(jobs, tempPid); //Delete the job
+        }  
+      else if(WIFEXITED(status)){  //If an exit is signaled
+        deletejob(jobs, tempPid);  //Delete it  
+        }  
+      else if (WIFSTOPPED(status)){ // If job is stopped, change state
+            getjobpid(jobs, tempPid)->state = ST; //Change the state to stopped
+            int tempJid = pid2jid(tempPid);
+            printf("Job [%d] (%d) Stopped by signal %d\n", tempJid, tempPid, WSTOPSIG(status));
+      }
+      else{ // If none of them are true, theres an issue
+        unix_error("Sigchld_handler Error!!");
+      }   
+    }
     return;
 }
 
@@ -389,9 +409,19 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-  // Put your code here. 
-  // Test 12345
+  int error = errno; //Set temp variable to errno in case of errors
+  sigset_t mask, prev_mask;
+  pid_t tempPid;
+  sigfillset(&mask); // initalize mask's signal set, return 0 if no error
+  sigprocmask(SIG_BLOCK, &mask, &prev_mask); //bloks union of current set and mask argument
+  tempPid = fgpid(jobs); //Get pid of FG job
+  if(tempPid){
+	  kill(-tempPid, SIGINT); //Kill if it is not 0 (a child)
+	}
+  sigprocmask(SIG_SETMASK, &prev_mask, NULL); //Set blocked siganls to prev_mask (reinstate)
+  errno = error; //Set errno to temporary error variable in case of error
   return;
+
 }
 
 /*
@@ -402,6 +432,18 @@ void sigint_handler(int sig)
 void sigtstp_handler(int sig) 
 {
   fprintf(stderr, "Change the state of the job\n");
+  int error = errno; //set temp varable to value held in errno, indicate if error was met in funtion
+  sigset_t mask, prev_mask;
+  pid_t tempPid;
+  sigfillset(&mask); //initialze maks's signal set, return 0 if no error, errno will be set upon error
+  sigprocmask(SIG_BLOCK, &mask, &prev_mask); //Blocked signals are union of mask and prev mask
+  tempPid = fgpid(jobs); //Set temporary pid to pid of foregorund job
+  if(tempPid) //If it is not 0 (not a child)
+{
+    kill(-tempPid, SIGTSTP); //Kill it
+}
+  sigprocmask(SIG_SETMASK, &prev_mask, NULL); //Blocked signals set to prev_mask
+  errno = error; //Set errno in case error was thrown
   return;
 }
 
